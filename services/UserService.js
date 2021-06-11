@@ -1,7 +1,11 @@
 const db = require('../models');
-const { Op } = require('sequelize')
+const { Op } = require('sequelize');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
+const saltRounds = 10;
 let apiCreateUser = async (username, password) => {
+  const salt = bcrypt.genSaltSync(saltRounds);
   let checkUserExist = await db.User.findOne({ where: { username: username } });
   if (checkUserExist) {
     throw new Error('Username đã tồn tại.');
@@ -9,7 +13,7 @@ let apiCreateUser = async (username, password) => {
   else {
     let userItem = {
       username: username,
-      password: password
+      password: bcrypt.hashSync(password, salt)
     }
     let user = await db.User.create(userItem);
     return { message: "Username tạo thành công !", user };
@@ -52,4 +56,21 @@ let apiReadUser = async () => {
   return {allUser};
 }
 
-module.exports = { apiCreateUser, apiUpdateUser, apiDeleteUser, apiReadUser }
+let apiLoginUser = async (data) => {
+  try {
+    let User = await db.User.findOne({ where: {username: data.username}});
+    if(!User) {
+      throw new Error("Tên đăng nhập không tồn tại !");
+    }
+    let checkPassword = await bcrypt.compareSync(data.password, User.password);
+    if(!checkPassword) {
+      throw new Error("Password nhập chưa chính xác.")
+    }
+    let accessToken = jwt.sign(data, process.env.SECRET_TEXT, {expiresIn: `${process.env.ACCESS_TOKEN_LIFE}`});
+    console.log(accessToken);
+  } catch (error) {
+    throw error;
+  }
+}
+
+module.exports = { apiCreateUser, apiUpdateUser, apiDeleteUser, apiReadUser, apiLoginUser }
